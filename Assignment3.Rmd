@@ -1,0 +1,533 @@
+---
+title: "Assignment 3"
+author: "Raghav Sharma"
+date: "2022-10-16"
+output: html_document # you can change to other output format if you want
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# 1. Exploratory data analysis
+
+### Initial Setup
+
+This section will be used for installing and loading packages
+
+```{r}
+library(tidyverse)
+library(Stat2Data)
+data(Hawks)
+head(Hawks)
+```
+
+
+### 1.1  Exploratory data analysis 
+#### (Q1)   
+
+Creating a vector which has values from the Hawks tail column and then calculating the mean and median for the vector.
+
+```{r}
+HawksTail = Hawks$Tail
+print(mean(HawksTail,na.rm= TRUE))
+print(median(HawksTail,na.rm= TRUE))
+
+
+```
+
+### 1.2  Combining location estimators with the summarise function
+
+#### (Q1)
+
+calculating Sample Mean , Sample Median and Trimmed Mean with (q=0.5) for columns Wing and weight
+
+```{r}
+print ("For Hawks Wings")
+
+summarize(Hawks, Wing_mean = mean(Wing , na.rm = TRUE) , Wing_t_Mean = mean(Wing, na.rm=TRUE, trim = 0.5) ,Wing_med = median(Wing, na.rm = TRUE), Weight_mean = mean(Weight, na.rm= TRUE) , Weight_t_mean = mean(Weight, na.rm = TRUE, trim=0.5), Weight_med = median(Weight,na.rm = TRUE)  )
+
+
+
+```
+
+####  (Q2)
+
+Calculating the above Sample Statistics by Species
+
+```{r}
+group_by(Hawks, Species) %>% summarize( Wing_mean = mean(Wing , na.rm = TRUE) , Wing_t_Mean = mean(Wing, na.rm=TRUE, trim = 0.5) ,Wing_med = median(Wing, na.rm = TRUE), Weight_mean = mean(Weight, na.rm= TRUE) , Weight_t_mean = mean(Weight, na.rm = TRUE, trim=0.5), Weight_med = median(Weight,na.rm = TRUE)  )
+```
+
+### 1.3 Location and dispersion estimators under linear transformations
+
+#### (Q1)   
+
+My Initial theory is that the mean would be changed by formula new_mean = old_mean*a + b
+
+Now using the vector HawksTail that you created in Section 1.1 as data and letting a = 2 and b = 3, verify
+your conclusion using R codes: Compute the mean of HawksTail*a+b and then compare it with the one
+obtained from the mean of HawksTail and your conclusion.
+
+```{r}
+newMean = function(x){
+  return(x*2+3)
+}
+hawks_new_tail = map_dbl(HawksTail,newMean)
+print(mean(hawks_new_tail,na.rm = TRUE))
+
+```
+
+#### (Q2)
+
+ Suppose further that X1, · · · , Xn has sample variance p and standard deviation q. What is the sample
+variance of X˜
+1, · · · , X˜
+n? What is the sample standard deviation of X˜
+1, · · · , X˜
+n?
+Now using the vector HawksTail that you created in Section 1.1 as data and letting a = 2 and b = 3, verify
+your result using R codes again.
+
+
+Initially
+```{r}
+print(var(HawksTail))
+print(sd(HawksTail))
+```
+
+After the formula is applied 
+```{r}
+print(var(hawks_new_tail))
+print(sd(hawks_new_tail))
+
+```
+
+### Q1.4  Robustness of location estimators
+
+#### Setup
+
+Initializing all the variables and functions as per the question
+
+```{r}
+hal<-Hawks$Hallux
+print(mean(hal,na.rm=TRUE))
+print(median(hal,na.rm=TRUE))
+hal<-hal[!is.na(hal)]
+outlier_val<-100
+num_outliers<-10
+corrupted_hal<-c(hal,rep(outlier_val,times=num_outliers))
+num_outliers_vect <- seq(0,1000)
+means_vect <- c()
+for(num_outliers in num_outliers_vect){
+corrupted_hal <- c(hal,rep(outlier_val,times=num_outliers))
+means_vect <- c(means_vect, mean(corrupted_hal))
+}
+print(means_vect[length(means_vect)]-1)
+```
+
+#### Q1
+
+Adjusting the above code for median
+
+
+``` {r}
+median_vect <- c()
+for(num_outliers in num_outliers_vect){
+corrupted_hal <- c(hal,rep(outlier_val,times=num_outliers))
+median_vect <- c(median_vect, median(corrupted_hal))
+}
+print(median_vect[length(median_vect)-1])
+```
+
+
+#### Q2
+
+```{r}
+t_means_vect <- c()
+for(num_outliers in num_outliers_vect){
+corrupted_hal <- c(hal,rep(outlier_val,times=num_outliers))
+t_means_vect<- c(t_means_vect, mean(corrupted_hal, trim = 0.1))
+}
+print(t_means_vect[length(t_means_vect)-1])
+```
+
+#### Q3
+
+```{r}
+df_means_medians <- data.frame(num_outliers=num_outliers_vect, mean=means_vect,
+t_mean=t_means_vect, median=median_vect)
+df_means_medians %>%
+pivot_longer(!num_outliers, names_to = "Estimator", values_to = "Value") %>%
+ggplot(aes(x=num_outliers,color=Estimator, linetype=Estimator,y=Value)) +
+geom_line()+xlab("Number of outliers")
+
+```
+
+### Q1.5 Box plots and outliers
+
+#### Q1
+Use the functions ggplot() and geom_boxplot() to create a box plot which summarises
+the distribution of hawk weights broken down by species.
+
+
+```{r}
+ggplot(data= Hawks , aes(x= Species ,y = Weight))+geom_boxplot()+xlab("Species")+ylab("Weights")
+```
+
+#### Q2  Quantiles
+
+```{r}
+prob = seq(0.25,0.75,0.25)
+group_by(Hawks,Species) %>% summarize(Quantile025=quantile(Weight,probs=0.25,na.rm=TRUE),Quantile050=quantile(Weight,probs=0.59,na.rm=TRUE),Quantile075=quantile(Weight,probs=0.75,na.rm=TRUE))
+```
+#### Q3 Inter Quartile range function
+
+We will be calculating whether a particular value is an outlier as per predefined conditions
+
+```{r}
+
+num_outliers = function(vect){
+  
+  q25 = quantile(vect,probs=0.25,na.rm=TRUE)
+  q75 = quantile(vect,probs=0.75,na.rm=TRUE)
+  IQR = q75-q25
+  lowerLimit = q25 - 1.5*IQR
+  higherLimit = q75 + 1.5*IQR
+  count = 0
+  for (i in na.omit(vect)){
+    
+ 
+    
+    if(i < lowerLimit | i > higherLimit){
+      count=count+1
+    }
+  }
+  return(count)
+}
+c=num_outliers(c(0,40,60,185))
+print(c)
+
+
+```
+
+#### Q4 Calculating the outliers of Hawks by weights
+
+Using the above function to calculate the outliers of hawks by weight by Species.
+
+```{r}
+group_by(Hawks,Species) %>% summarize(number_of_outliers = num_outliers(Weight))
+```
+
+
+### Q1.6 Covariance and correlation under linear transformations
+
+#### Q1
+Compute the covariance and correlation between the Weight and Wing of the Hawks data.
+Due to na val
+
+```{r}
+print("The Covariance between Weight and Wing is  ")
+print(cov(Hawks$Weight,Hawks$Wing,use="complete.obs"))
+print("The correlation between Weight and Wing is  ")
+print(cor(Hawks$Weight,Hawks$Wing,use="complete.obs"))
+```
+#### Q2
+Firstly creating functions to transform Hawks weight and hawks wing. After that creating new Variables for transformed values and then calculating covariance and correlation
+
+```{r}
+
+weightTransformer=function(x){
+  return(x*2.4+ 7.1)
+}
+
+wingTransformer=function(x){
+  return(x*(-1)+ 3)
+}
+transformed_Weight = map_dbl(Hawks$Weight,weightTransformer)
+transformed_wing = map_dbl(Hawks$Wing,wingTransformer)
+
+print("The covariance between the new transformed Weight and Wing are")
+print(cov(transformed_Weight,transformed_wing,use = "complete.obs"))
+print("The correlation between the new transformed Weight and Wing are")
+print(cor(transformed_Weight,transformed_wing,use = "complete.obs"))
+
+```
+
+
+# 2. Random experiments, events and sample spaces, and the set theory
+
+### 2.1 Random experiments, events and sample spaces
+
+**Q1  Firstly, write down the definition of a random experiment, event and sample space**
+
+1) *Random Experiment* -  A random experiment is any well-defined procedure that produces an observable outcome that could not be perfectly predicted in advance [1]. For example tossing a coin or rolling a dice
+
+2) *Event* - An event is a possible outcome which can occur when an random experiment is performed. For example getting tails when a fair coin was tossed.
+
+3) *Sample Space* - Sample space is collection of all the possible events which can occur during a random experiment. For example while tossing a fair coin exactly once, the possible outcomes are heads or tails , hence the sample space is {heads,tails} 
+
+**Q2 Consider a random experiment of rolling a dice twice. Give an example of what is an event in this
+random experiment. Also, can you write down the sample space as a set? What is the total number of
+different events in this experiment? Is the empty set considered as an event?**
+
+1) Here, as we are rolling a fair dice twice, the output of each roll combine to make a single event. Suppose on the first roll the player gets 3 and on the other roll the player gets a 5. In this case the event would be recorded as (3,5).
+
+2) The Sample set would have 36 different events. In (i,j) the i represents the result of the first roll and j represents the result of the second roll. The sample space is as follows,
+
+ S= {(1,1),(1,2),(1,3),(1,4),(1,5),(1,6),
+(2,1),(2,2),(2,3),(2,4),(2,5),(2,6),
+(3,1),(3,2),(3,3),(3,4),(3,5),(3,6),
+(4,1),(4,2),(4,3),(4,4),(4,5),(4,6),
+(5,1),(5,2),(5,3),(5,4),(5,5),(5,6),
+(6,1),(6,2),(6,3),(6,4),(6,5),(6,6)}
+
+3) There are 36 different events are possible in this experiment
+
+4) As a dice when rolled even once will generate an output between 1-6, it is not possible for an empty set to be the subset of the sample space
+
+### 2.2 Set Theory
+
+#### Q1 Set Operations
+
+Let the sets A, B, C be defined by A := {1, 2, 3}, B := {2, 4, 6}, C := {4, 5, 6}.
+
+####### **1). What are the unions A ∪ B and A ∪ C?** 
+
+1) $A ∪ B$ = {1,2,3,4,6} 
+2) $A ∪ C$ = {1,2,3,4,5,6}
+
+####### **2). What are the intersections A ∩ B and A ∩ C?**
+1) $A ∩ B$ = {2}
+2) $A ∩ C$ = { $\phi$ }
+
+####### **3). What are the complements A\B and A\C?**
+1) $A\B$ = {1,3}
+2) $A\C$ = {1,2,3}
+
+####### **4). Are A and B disjoint? Are A and C disjoint?**
+1) As $A ∩ B$ = {2}, hence A and B sets are not disjoint.
+2) As $A ∩ C$ = { $\phi$ } , hence A and C are disjoint
+
+####### **5).  Are B and $A\B$ disjoint?**
+ As $A\B$ = {1,3} and B = {2, 4, 6}, so $B ∩ (A\B)$ = { $\phi$ }. Hence they are disjointed sets.
+
+####### **6).  Write down a partition of {1,2,3,4,5,6} consisting of two sets. Also, write down another partition of**
+**{1,2,3,4,5,6} consisting of three sets**
+
+1) Partition consisting 2 sets are p = {1,2,3} and q = {4,5,6}
+2) Partition consisting 3 sets are p= {1,2} , q={3,4,5} and r={6}
+
+#### Q2 Complements, subsets and De Morgan’s laws
+
+  Let Ω be a sample space. Recall that for an event A ⊆ Ω the complement $A^{c}$:= Ω\A := {w ∈ Ω : w /∈ A}.
+Take a pair of events A ⊆ Ω and B ⊆ Ω.
+
+####### **1). Can you give an expression for ($A^{c})^{c}$) without using the notion of a complement?**
+
+As $A^{c}$:= Ω\A then $(A^{c})^{c}$) = $(Ω\A)^{c}$. Now if we substitute the last complement , we get $((Ω\A)\Ω)$ = A
+
+####### **2)  What is $Ω^{c}$?**
+$Ω^{c}$ = ${\phi}$
+
+####### **3)  Show that if A ⊆ B, then $B^{c}$ ⊆ $A^{c}$**
+
+As A ⊆ B , then for all $x \in A$ , $x \in B$,
+
+Let $y \in B^{c}$ , then $y \notin B$ and as A ⊆ B  then by extension $y \notin A$, 
+
+Thus $y \in A^{c}$. So we can say $B^{c}$ ⊆ $A^{c}$
+
+####### **4) (De Morgan’s laws) **
+
+1) Proving $(A \cap B)^{c}$ = $A^{c} \cup B^{c}$
+
+Let $x \in (A \cap B)^{c}$, so it means $x \notin (A \cap B)$ ,
+
+By extension we can say $x \notin A$ and $x \notin B$ ,
+
+hence $x \in A^{c}$ or $x \in B^{c}$ , 
+
+Therefore $x \in A^{c} \cup B^{c}$ , 
+
+Proving $(A \cap B)^{c}$ = $A^{c} \cup B^{c}$
+
+2) Writing out an expression for $(\cap_{k=1}^{K} A_{k})^{c}$ where ${A_{1},A_{2},-,-,-,A_{k}} \subset U$
+
+By Expanding the equation we get $(A_{1} \cap A_{2} \cap A_{3} \cap A_{4} ------- \cap A_{k})^{c}$ , 
+
+now if we apply the complement  the equation becomes $(A_{1}^{c} \cup A_{2}^{c} \cup A_{3}^{c} \cup A_{4}^{c} -------- \cup A_{k}^{c})$ ,
+
+By condensing the equation we can say $( \cup_{k=1} ^ {k} A_{k}^{c})$
+
+
+
+
+
+####### **5) Proving $(A \cup B)$ $^{c}$ = $A^{c} \cap B^{c}$ **
+
+ 
+
+Lets say $x \in (A \cup B)^{c}$ ,
+Then $x \notin (A \cup B)$, so we can say $x \notin A$ or $x \notin B$ ,
+By extension we can say $x \in A^{c}$ and $x \in B^{c}$ ,
+Thus $x \in A^{c} \cap B^{c}$, So $(A \cup B)$ $^{c}$ = $A^{c} \cap B^{c}$
+
+
+####### **6) Writing an expression for $( \cup_{k=1} ^ {k} A_{k})^{c}$  where ${A_{1},A_{2},-,-,-,A_{k}} \subset U$**
+
+By Expanding the expression we get $(A_{1} \cup A_{2} \cup A_{3} \cup A_{4} --------- \cup A_{k})^{c}$,
+
+now by applying the complement we get $(A_{1}^{c} \cap A_{2}^{c} \cap A_{3}^{c} \cap A_{4}^{c} ------- \cap A_{k}^{c})$,
+
+now by condensing the expression we get **$( \cap_{k=1} ^ {k} A_{k}^{c})$**
+
+
+#### Q3 Cardinality and the set of all subsets
+
+**Suppose that Ω = {w1, w2, · · · , wK} contains K elements for some natural number K. Here Ω has cardinality**
+**K.**
+**Let E be a set of all subsets of Ω, i.e., E := {A|A ⊂ Ω}. Give a formula for the cardinality of E in terms of**
+**K.**
+
+A power set is a set which contains all the possible subsets of a master set , in the above scenario the Master Set can be Ω  and E is its  power set. The cardinality of any power set is $2^{n}$ where n is the number of elements in the master  set, hence in this case cardinality of ** $E = 2^{K}$
+
+
+#### Q4 Disjointness and partitions.
+Suppose we have a sample space Ω, and events A1, A2, A3, A4 are subsets of Ω.
+
+####### **1) Can you think of a set which is disjoint from every other set? That is, find a set A ⊆ Ω such that**
+**A ∩ B = ∅ for all B ⊆ Ω**
+
+Let Ω be the set of first 100 natural numbers, Also let A be the set of odd natural numbers upto 100 and B be a set of even natural numbers upto 100.
+
+Now in this case we can say A and B are disjointed sets as $A \cap B = \phi$ and $B \subseteq \Omega$
+
+####### **2)Define events S1 := A1, S2 = A2\A1, S3 = A3\(A1 ∪ A2), S4 = A4\(A1 ∪ A2 ∪ A3). Show that**
+**S1, S2, S3, S4 form a partition of A1 ∪ A2 ∪ A3 ∪ A4.**
+
+Let A1 = {1,2,3} , A2 = {3,4,5} , A3 = {5,6,7} and A4 = {7,8,9}
+
+Now $A1 \cup A2$ ={1,2,3,4,5} ,  $A1 \cup A2 \cup A3$ = {1,2,3,4,5,6,7} and $A1 \cup A2 \cup A3 \cup A4$ = {1,2,3,4,5,6,7,8,9}
+
+S1 = A1 , so S1 = {1,2,3}
+
+S2 = A2\A1 so S3 = {4,5}
+
+S3 = A3\ $(A1 \cup A2)$ so S3 = {6,7}
+
+S4 = A4 \ $(A1 \cup A2 \cup A3)$ ={8,9}
+
+
+so S1 S2 S3 S4 partions make up = {1,2,3,4,5,6,7,8,9} = $A1 \cup A2 \cup A3 \cup A4$
+
+
+
+#### Q5 Indicator function
+
+**Suppose we have a sample space Ω, and the event A is a subset of Ω. Let 1A be the indicator function of A.**
+
+Let sample space Ω = first 15 natural numbers
+let A = {1,2,3,4,5}
+
+####### **1  Write down the indicator function $1_{A^{c}}$ of $A^{c}$**
+**(use $1_{A}$ in your formula). **
+
+As we know if $x \in A$ then value of $1_{A}$  = 1 , $x \notin A$ then value of $1_{A}$  = 0.
+
+So function $1_{A^{c}}$ = 1 when  $1_{A}$  = 0 ,because when $x \notin A$, then $x \in A^{c}$
+
+also function $1_{A^{c}}$ = 0 when  $1_{A}$  = 1 ,because when $x \in A$, then $x \notin A^{c}$
+
+####### **2  Can you find a set B whose indicator function is $1_{A^{c}} + 1_{A}$?**
+
+Let function f(x) = $1_{A^{c}} + 1_{A}$
+
+when $x \notin A$, value of f(x)= 1+0
+when $x \in A$, value of f(x)= 0+1
+
+hence f(x) is always 1 irrespective of x , hence set B = $\Omega$
+
+####### **3 Recall that 1$_{A∩B}$ = 1$_{A}$ · 1$_{B}$ and 1$_{A∪B}$ = max{(1$_{A}$, 1$_{B}$) = 1$_{A}$ + 1$_{B}$ − 1$_{A}$ · 1$_{B}$ for any A ⊆ Ω and **
+**B ⊆ Ω. Combining this with the conclusion from Question (Q5) 1, Use indicator functions to prove**
+**(A ∩ B)$^{c}$ = A$^{c}$ ∪ B$^{c}$ (De Morgan’s laws)**
+
+ Possible Problem with the question
+
+Lets say $x \in A$ and $y \in B$ , which means the indicator function for $1_{A}(x) = 1$ and $1_{B}(y) = 1$.
+
+Now if we do $A \cup B$ then ${x,y} \in A \cup B$. Hence 1$_{A∪B}(x,y)$ = 1.
+
+But if we follow the formula  1$_{A∪B}(x,y)$ = max{(1$_{A}$(x), 1$_{B}$(y)) = 1$_{A}$(x) + 1$_{B}$(y) − 1$_{A}$(x) · 1$_{B}$(y)
+
+we get  1$_{A∪B}(x,y)$ = max(1,1) = 1+1 - 1.1
+
+By Binary maths we get 1$_{A∪B}(x,y)$ = max(1,1) = 1 - 1 = 0 
+
+Which means  ${x,y} \notin A \cup B$ when $x \in A$ and $y \in B$
+
+there may be a problem caused by subtracting the 1$_{A}$(x) · 1$_{B}$(y) from the max{(1$_{A}$(x), 1$_{B}$(y)) function.
+                                                  
+
+
+# 3. Visualisation
+
+####  (Q1)
+Plotting Density plots for Hawks Tails grouped by Species
+
+```{r}
+group_by(Hawks,Species) %>% ggplot(aes(x=Tail , color = Species))+geom_density(adjust=1)+xlab("Tail(mm) ")+ylab("Denisty")
+
+```
+
+
+####  (Q2)
+Plotting Violin plots for Hawks Tails grouped by Species
+```{r}
+group_by(Hawks,Species) %>% ggplot(aes(x=Tail , y = Species, fill = Species))+geom_violin()+theme_bw()+xlab("Tail(mm) ")+ylab("Denisty")
+```
+
+####  (Q3)
+Plotting the scatter plot
+1. There are 3 aesthetics Species , Tail and Weight
+2. There are 3 glpyhs which mark each species
+3. There are 3 aesthetics , Color , Direction and Area
+
+
+```{r}
+group_by(Hawks,Species) %>% ggplot(aes(x=Tail , y = Weight))+geom_point(aes(color=Species,shape=Species))+xlab("Tail(mm)")+ylab("Weight(grams)")
+```
+
+
+####  (Q4)
+
+Plotting graphs with Facet Wrap as per species and using geom_smooth()
+
+1. There are three visual Ques = Direction , color, area
+
+2. The relation between hawks tail and weight is directly proportional 
+
+```{r}
+group_by(Hawks,Species) %>% ggplot(aes(x=Tail , y = Weight))+geom_point(aes(color=Species))+geom_smooth(method='lm')+facet_wrap(~Species)+xlab("Tail(mm)")+ylab("Weight(grams)")
+```
+
+####  (Q5)
+Firstly creating a data frame which has the information for the heaviest hawk and then using the data to annotate the heaviest Hawk present.
+
+```{r}
+max(Hawks$Weight, na.rm = TRUE)
+
+heavy_hawk = select(filter(Hawks,Weight == 2030),Weight,Tail)
+
+group_by(Hawks,Species) %>% ggplot(aes(x=Tail , y = Weight))+geom_point(aes(color=Species,shape=Species))+xlab("Tail(mm)")+ylab("Weight(grams)")+geom_curve(data = heavy_hawk,x=210,xend=heavy_hawk$Tail,y=1750,yend=heavy_hawk$Weight,arrow=arrow(length=unit(0.3,'cm')),curvature=0.1)+geom_text(x=210,y=1750 , label = "Heaviest Hawk")
+
+```
+
+# References
+
+###### 1. https://www.sciencedirect.com/topics/mathematics/random-experiment
+###### 
+.....
+
+
+
